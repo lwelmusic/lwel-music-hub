@@ -89,7 +89,7 @@ function Queue({ me }) {
   const [err, setErr] = useState('')
   const load = useCallback(() => {
     supabase.from('songs')
-      .select('id,title,description,credits,language,created_at,rights_confirmed,owner_id,profiles(display_name),categories(name)')
+      .select('id,title,description,credits,language,created_at,rights_confirmed,owner_id,audio_key,cover_key,profiles(display_name),categories(name)')
       .eq('status', 'pending').order('created_at').then(({ data }) => setRows(data || []))
   }, [])
   useEffect(() => { load() }, [load])
@@ -116,6 +116,7 @@ function Queue({ me }) {
           <p className="muted small">
             by <Link className="link" href={`/artist/${s.owner_id}`}>{s.profiles?.display_name}</Link> · {s.categories?.name || 'No category'} · {s.language || 'Language not set'} · sent {new Date(s.created_at).toLocaleDateString()}
           </p>
+          {s.audio_key && <AudioPreview path={s.audio_key} />}
           <p>{s.description || 'No description.'}</p>
           {s.credits && <p className="muted small">Credits: {s.credits}</p>}
           <p className="small">{s.rights_confirmed ? 'Rights declaration confirmed by the artist.' : 'No rights declaration!'}</p>
@@ -158,6 +159,8 @@ function Songs({ me }) {
   }
   async function remove(s) {
     if (!window.confirm('Permanently delete "' + s.title + '"? This cannot be undone.')) return
+    if (s.audio_key) await supabase.storage.from('audio').remove([s.audio_key])
+    if (s.cover_key) await supabase.storage.from('covers').remove([s.cover_key])
     const { error } = await supabase.from('songs').delete().eq('id', s.id)
     if (error) setErr(error.message)
     else load()
@@ -450,4 +453,10 @@ function SiteContent({ me }) {
       {msg && <p className="muted" role="status">{msg}</p>}
     </div>
   )
+}
+
+function AudioPreview({ path }) {
+  const [url, setUrl] = useState(null)
+  useEffect(() => { supabase.storage.from('audio').createSignedUrl(path, 3600).then(({ data }) => setUrl(data?.signedUrl || null)) }, [path])
+  return url ? <audio className="audioel" controls preload="none" src={url} /> : <p className="muted small">Loading audio…</p>
 }

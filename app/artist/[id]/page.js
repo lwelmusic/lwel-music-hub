@@ -15,7 +15,7 @@ export default function Artist() {
 
   useEffect(() => {
     supabase.from('profiles').select('*').eq('id', id).maybeSingle().then(({ data }) => setP(data))
-    supabase.from('songs').select('id,title,owner_id,profiles(display_name)').eq('owner_id', id).eq('status', 'approved')
+    supabase.from('songs').select('id,title,owner_id,cover_key,profiles(display_name)').eq('owner_id', id).eq('status', 'approved')
       .order('created_at', { ascending: false }).then(({ data }) => setSongs(data || []))
   }, [id])
 

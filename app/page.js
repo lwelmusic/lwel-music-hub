@@ -14,14 +14,14 @@ export default function Home() {
   useEffect(() => {
     supabase
       .from('songs')
-      .select('id,title,owner_id,profiles(display_name)')
+      .select('id,title,owner_id,cover_key,profiles(display_name)')
       .eq('status', 'approved')
       .order('created_at', { ascending: false })
       .limit(48)
       .then(({ data }) => setSongs(data || []))
     supabase.from('site_content').select('key,value').in('key', ['home_headline', 'home_intro', 'announcement'])
       .then(({ data }) => { const m = {}; (data || []).forEach((r) => { m[r.key] = r.value }); setSite(m) })
-    supabase.from('songs').select('id,title,owner_id,profiles(display_name)').eq('status', 'approved').eq('featured', true).limit(8)
+    supabase.from('songs').select('id,title,owner_id,cover_key,profiles(display_name)').eq('status', 'approved').eq('featured', true).limit(8)
       .then(({ data }) => setFeatured(data || []))
   }, [])
 

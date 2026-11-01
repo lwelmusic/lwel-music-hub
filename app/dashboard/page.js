@@ -37,7 +37,7 @@ export default function Dashboard() {
       if (error) setErr('Could not load your profile: ' + error.message)
       else if (prof.role === 'admin') return router.push('/admin')
       else setP(prof)
-      const { data: mine } = await supabase.from('songs').select('id,title,status,views,plays,downloads')
+      const { data: mine } = await supabase.from('songs').select('id,title,status,views,plays,downloads,rejection_reason,audio_key,cover_key')
         .eq('owner_id', user.id).order('created_at', { ascending: false })
       setSongs(mine || [])
     })
@@ -84,6 +84,15 @@ export default function Dashboard() {
     setPwMsg('Password changed.')
   }
 
+  async function removeSong(s) {
+    if (!window.confirm('Remove "' + s.title + '"?')) return
+    if (s.audio_key) await supabase.storage.from('audio').remove([s.audio_key])
+    if (s.cover_key) await supabase.storage.from('covers').remove([s.cover_key])
+    const { error } = await supabase.from('songs').delete().eq('id', s.id)
+    if (error) setErr(error.message)
+    else setSongs(songs.filter((x) => x.id !== s.id))
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
     router.push('/')
@@ -102,6 +111,8 @@ export default function Dashboard() {
         <Link href={`/artist/${uid}`} className="link">View my public profile</Link>
       </p>
 
+      <div className="acts"><Link className="btn" href="/upload">Upload a new song</Link></div>
+
       <h2>Statistics</h2>
       <div className="stats">
         <div><b>{songs.length}</b><span>Songs</span></div>
@@ -110,7 +121,7 @@ export default function Dashboard() {
         <div><b>{sum('downloads')}</b><span>Downloads</span></div>
       </div>
       {songs.length === 0 ? (
-        <p className="note">You have no songs yet. Song uploads are coming in the next stage.</p>
+        <p className="note">You have no songs yet. Use the Upload button to share your first one.</p>
       ) : (
         <div className="tablewrap">
           <table>
@@ -119,7 +130,7 @@ export default function Dashboard() {
               {songs.map((s) => (
                 <tr key={s.id}>
                   <td><Link href={`/song/${s.id}`} className="link">{s.title}</Link></td>
-                  <td>{STATUS[s.status]}</td><td>{s.views}</td><td>{s.plays}</td><td>{s.downloads}</td>
+                  <td>{STATUS[s.status]}{s.status === 'rejected' && s.rejection_reason ? <div className="muted small">Reason: {s.rejection_reason}</div> : null}{s.status === 'pending' ? <> <button className="mini-btn danger" onClick={() => removeSong(s)}>Remove</button></> : null}</td><td>{s.views}</td><td>{s.plays}</td><td>{s.downloads}</td>
                 </tr>
               ))}
             </tbody>
