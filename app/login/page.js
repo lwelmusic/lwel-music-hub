@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import PasswordInput from '../../components/PasswordInput'
 
 export default function Login() {
   const router = useRouter()
@@ -25,10 +26,11 @@ export default function Login() {
       <h1>Sign in</h1>
       <form onSubmit={submit}>
         <label>Email<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-        <label>Password<input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+        <PasswordInput label="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         <button className="btn" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>
       {err && <p className="error" role="alert">{err}</p>}
+      <p className="muted"><Link href="/forgot" className="link">Forgot your password?</Link></p>
       <p className="muted">New here? <Link href="/register" className="link">Create an artist account</Link></p>
     </div>
   )

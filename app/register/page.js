@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import PasswordInput from '../../components/PasswordInput'
 
 export default function Register() {
   const router = useRouter()
@@ -43,7 +44,7 @@ export default function Register() {
           </select>
         </label>
         <label>Email<input type="email" required value={f.email} onChange={set('email')} /></label>
-        <label>Password (at least 8 characters)<input type="password" minLength={8} required value={f.password} onChange={set('password')} /></label>
+        <PasswordInput label="Password (at least 8 characters)" minLength={8} autoComplete="new-password" value={f.password} onChange={set('password')} />
         <button className="btn" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
       </form>
       {err && <p className="error" role="alert">{err}</p>}

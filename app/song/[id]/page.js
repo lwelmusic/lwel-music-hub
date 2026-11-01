@@ -14,6 +14,14 @@ export default function Song() {
       .then(({ data }) => setS(data))
   }, [id])
 
+  useEffect(() => {
+    if (!s || s.status !== 'approved') return
+    const k = 'viewed:' + id
+    if (sessionStorage.getItem(k)) return
+    try { sessionStorage.setItem(k, '1') } catch (e) {}
+    supabase.rpc('track_song', { p_song: id, p_kind: 'view' })
+  }, [s, id])
+
   if (s === undefined) return <p className="muted">Loading…</p>
   if (s === null) return <p className="muted">Song not found. <Link href="/" className="link">Back to music</Link></p>
 
@@ -29,6 +37,7 @@ export default function Song() {
         {s.categories?.name ? ' · ' + s.categories.name : ''}
         {s.status !== 'approved' ? ' · ' + s.status + ' (only you and LWEL can see this)' : ''}
       </p>
+      <p className="muted">{s.views ?? 0} views · {s.plays ?? 0} plays · {s.downloads ?? 0} downloads</p>
       <p className="note">Audio playback and downloads are coming in the next stage.</p>
       <div className="acts">
         <button className="btn ghost" onClick={share}>Share on WhatsApp</button>

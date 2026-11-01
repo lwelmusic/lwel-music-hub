@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import SongCard from '../../../components/SongCard'
+import Avatar from '../../../components/Avatar'
 
 const TYPES = { solo: 'Solo artist', choir: 'Choir', group: 'Singing group' }
 
@@ -25,7 +26,7 @@ export default function Artist() {
     <>
       <Link href="/" className="back">‹ All music</Link>
       <div className="ap">
-        <div className="avatar">{p.display_name.split(' ').slice(0, 2).map((w) => w.charAt(0)).join('')}</div>
+        <Avatar profile={p} size={140} />
         <div>
           <h1>{p.display_name}</h1>
           <p className="by">{TYPES[p.profile_type]}{p.location ? ' · ' + p.location : ''}</p>
