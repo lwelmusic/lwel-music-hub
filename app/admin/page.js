@@ -53,6 +53,7 @@ export default function Admin() {
 function Overview({ go }) {
   const [s, setS] = useState(null)
   useEffect(() => {
+    const run = () => {
     const head = { count: 'exact', head: true }
     const c = (q) => q.then((r) => r.count || 0)
     Promise.all([
@@ -66,6 +67,10 @@ function Overview({ go }) {
       const sum = (k) => rows.reduce((a, r) => a + (r[k] || 0), 0)
       setS({ pending, approved, users, reports, recent, views: sum('views'), plays: sum('plays'), downloads: sum('downloads') })
     })
+    }
+    run()
+    const t = setInterval(() => { if (!document.hidden) run() }, 10000)
+    return () => clearInterval(t)
   }, [])
   if (!s) return <p className="muted">Loading…</p>
   const Card = ({ n, label, to }) => (

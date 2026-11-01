@@ -97,3 +97,5 @@ a.mini-btn{display:inline-flex;align-items:center}
 .chip{flex:none;min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font:500 14px system-ui,sans-serif;cursor:pointer}
 .chip[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
 .filters{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;margin:4px 0 16px}
+.livedot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:blink 1.6s infinite}
+@keyframes blink{50%{opacity:.25}}

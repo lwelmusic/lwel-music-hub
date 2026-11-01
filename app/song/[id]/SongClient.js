@@ -17,16 +17,25 @@ export default function SongClient() {
   }, [id])
 
   useEffect(() => {
+    const t = setInterval(() => {
+      if (document.hidden) return
+      supabase.from('songs').select('views,plays,downloads').eq('id', id).maybeSingle()
+        .then(({ data }) => { if (data) setS((p) => (p ? { ...p, ...data } : p)) })
+    }, 10000)
+    return () => clearInterval(t)
+  }, [id])
+
+  useEffect(() => {
     if (!s?.audio_key) return
     supabase.storage.from('audio').createSignedUrl(s.audio_key, 3600).then(({ data }) => setSrc(data?.signedUrl || null))
-  }, [s])
+  }, [s?.audio_key])
 
   useEffect(() => {
     if (!s || s.status !== 'approved') return
     const k = 'viewed:' + id
     if (sessionStorage.getItem(k)) return
     try { sessionStorage.setItem(k, '1') } catch (e) {}
-    supabase.rpc('track_song', { p_song: id, p_kind: 'view' })
+    supabase.rpc('track_song', { p_song: id, p_kind: 'view' }).then(({ error }) => { if (error) console.error('count failed', error.message) })
   }, [s, id])
 
   if (s === undefined) return <p className="muted">Loading…</p>
@@ -40,7 +49,7 @@ export default function SongClient() {
     const k = 'played:' + id
     if (sessionStorage.getItem(k)) return
     try { sessionStorage.setItem(k, '1') } catch (e) {}
-    supabase.rpc('track_song', { p_song: id, p_kind: 'play' })
+    supabase.rpc('track_song', { p_song: id, p_kind: 'play' }).then(({ error }) => { if (error) console.error('count failed', error.message) })
   }
   async function download() {
     setBusy(true)
@@ -48,7 +57,7 @@ export default function SongClient() {
     const { data, error } = await supabase.storage.from('audio').createSignedUrl(s.audio_key, 300, { download: name })
     setBusy(false)
     if (error || !data) return alert('Download is not available right now.')
-    if (s.status === 'approved') supabase.rpc('track_song', { p_song: id, p_kind: 'download' })
+    if (s.status === 'approved') supabase.rpc('track_song', { p_song: id, p_kind: 'download' }).then(({ error }) => { if (error) console.error('count failed', error.message) })
     window.location.href = data.signedUrl
   }
   const share = () => window.open('https://wa.me/?text=' + encodeURIComponent(s.title + ' on LWEL Music Hub ' + window.location.href))

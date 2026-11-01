@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [uid, setUid] = useState(null)
   const [p, setP] = useState(null)
   const [songs, setSongs] = useState([])
+  const [updated, setUpdated] = useState(null)
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [picMsg, setPicMsg] = useState('')
@@ -42,6 +43,17 @@ export default function Dashboard() {
       setSongs(mine || [])
     })
   }, [router])
+
+  useEffect(() => {
+    if (!uid) return
+    const load = () => supabase.from('songs').select('id,title,status,views,plays,downloads,rejection_reason,audio_key,cover_key')
+      .eq('owner_id', uid).order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) { setSongs(data); setUpdated(new Date()) } })
+    const t = setInterval(() => { if (!document.hidden) load() }, 10000)
+    const vis = () => { if (!document.hidden) load() }
+    document.addEventListener('visibilitychange', vis)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis) }
+  }, [uid])
 
   async function save(e) {
     e.preventDefault()
@@ -114,6 +126,7 @@ export default function Dashboard() {
       <div className="acts"><Link className="btn" href="/upload">Upload a new song</Link></div>
 
       <h2>Statistics</h2>
+      <p className="muted small"><span className="livedot" /> Live, refreshes every 10 seconds{updated ? ' · updated ' + updated.toLocaleTimeString() : ''}</p>
       <div className="stats">
         <div><b>{songs.length}</b><span>Songs</span></div>
         <div><b>{sum('views')}</b><span>Views</span></div>
