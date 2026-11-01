@@ -35,6 +35,7 @@ export default function Dashboard() {
       setUid(user.id)
       const { data: prof, error } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       if (error) setErr('Could not load your profile: ' + error.message)
+      else if (prof.role === 'admin') return router.push('/admin')
       else setP(prof)
       const { data: mine } = await supabase.from('songs').select('id,title,status,views,plays,downloads')
         .eq('owner_id', user.id).order('created_at', { ascending: false })

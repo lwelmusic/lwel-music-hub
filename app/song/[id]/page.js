@@ -45,6 +45,33 @@ export default function Song() {
       </div>
       {s.description && <p>{s.description}</p>}
       {s.credits && <p className="muted">Credits: {s.credits}</p>}
+      <ReportForm songId={s.id} />
     </>
+  )
+}
+
+function ReportForm({ songId }) {
+  const [open, setOpen] = useState(false)
+  const [f, setF] = useState({ name: '', email: '', details: '' })
+  const [msg, setMsg] = useState('')
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+  async function send(e) {
+    e.preventDefault()
+    const { error } = await supabase.from('rights_reports').insert({ song_id: songId, reporter_name: f.name, reporter_email: f.email, details: f.details })
+    setMsg(error ? 'Could not send: ' + error.message : 'Thank you. LWEL will review your report.')
+    if (!error) setOpen(false)
+  }
+  return (
+    <div className="reportbox">
+      {msg && <p className="ok" role="status">{msg}</p>}
+      {!open ? <button className="mini-btn" onClick={() => setOpen(true)}>Report a copyright concern</button> : (
+        <form onSubmit={send} className="narrow">
+          <label>Your name<input required value={f.name} onChange={set('name')} /></label>
+          <label>Your email<input type="email" required value={f.email} onChange={set('email')} /></label>
+          <label>What is the concern?<textarea required rows={4} value={f.details} onChange={set('details')} /></label>
+          <button className="btn ghost">Send report</button>
+        </form>
+      )}
+    </div>
   )
 }

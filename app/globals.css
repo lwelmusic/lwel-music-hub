@@ -61,3 +61,26 @@ table{width:100%;border-collapse:collapse;font-size:15px}
 th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
 th{color:var(--muted);font-weight:500}
 @media(min-width:760px){.stats{grid-template-columns:repeat(4,1fr)}}
+.dash.wide{max-width:960px}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:14px 0;margin-bottom:8px}
+.tab{flex:none;min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font:500 14px system-ui,sans-serif;cursor:pointer}
+.tab.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.stats.four{grid-template-columns:repeat(2,1fr)}
+.statbtn{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:left;color:var(--text);font:inherit;cursor:pointer}
+.statbtn:disabled{cursor:default}.statbtn:not(:disabled):hover{border-color:var(--cyan)}
+.statbtn b{display:block;font-size:30px;color:var(--cyan)}.statbtn span{color:var(--muted);font-size:14px}
+.item{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:14px 0;display:flex;flex-direction:column;gap:8px}
+.item h3{font-size:20px}.item p{margin:0}
+.inline{flex-direction:row;align-items:center;gap:10px;margin:8px 0}
+.inlineform{display:flex;gap:10px;margin:8px 0 16px}.inlineform input{flex:1;min-width:0}
+.plain{list-style:none;padding:0;display:flex;flex-direction:column;gap:8px}
+.plain li{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px}
+.rowacts{display:flex;gap:6px}
+.mini-btn{min-height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--text);font:600 13px system-ui,sans-serif;cursor:pointer}
+.mini-btn.danger{color:#ff8a8a;border-color:#5b2a35}
+@media(min-width:760px){.stats.four{grid-template-columns:repeat(4,1fr)}}
+.reportbox{margin-top:32px;padding-top:16px;border-top:1px solid var(--line)}
+.banner{background:linear-gradient(90deg,#102a66,#3b1a73);border:1px solid var(--line);border-radius:12px;padding:10px 16px;margin:0 auto 16px;max-width:640px;color:var(--text)}
+.doc{max-width:720px;margin:16px auto}.doc h1{font-size:34px;margin-bottom:16px}.doc h2{font-size:22px;margin:24px 0 8px}.doc p{color:#cdd8f5}
+.flinks{display:flex;flex-wrap:wrap;gap:8px 18px;margin:10px 0 0}.flinks a:hover{color:var(--cyan)}
+footer p{margin:0}

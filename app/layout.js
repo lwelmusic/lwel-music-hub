@@ -13,7 +13,10 @@ export default function RootLayout({ children }) {
         <div className="wrap">
           <Header />
           <main>{children}</main>
-          <footer>LWEL Music Hub · One Faith. One Voice. One Music Family.</footer>
+          <footer>
+            <p>LWEL Music Hub · One Faith. One Voice. One Music Family.</p>
+            <p className="flinks"><a href="/p/about">About</a><a href="/p/terms">Terms</a><a href="/p/privacy">Privacy</a><a href="/p/copyright">Copyright</a><a href="/p/contributor-agreement">Contributor agreement</a><a href="/p/contact">Contact</a></p>
+          </footer>
         </div>
       </body>
     </html>
