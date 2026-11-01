@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { usePlayer } from '../../../components/PlayerProvider'
 
 export default function SongClient() {
   const { id } = useParams()
+  const player = usePlayer()
   const [s, setS] = useState(undefined)
-  const [src, setSrc] = useState(null)
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -26,15 +27,9 @@ export default function SongClient() {
   }, [id])
 
   useEffect(() => {
-    if (!s?.audio_key) return
-    supabase.storage.from('audio').createSignedUrl(s.audio_key, 3600).then(({ data }) => setSrc(data?.signedUrl || null))
-  }, [s?.audio_key])
-
-  useEffect(() => {
     if (!s || s.status !== 'approved') return
     const k = 'viewed:' + id
-    if (sessionStorage.getItem(k)) return
-    try { sessionStorage.setItem(k, '1') } catch (e) {}
+    try { if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1') } catch (e) {}
     supabase.rpc('track_song', { p_song: id, p_kind: 'view' }).then(({ error }) => { if (error) console.error('count failed', error.message) })
   }, [s, id])
 
@@ -43,21 +38,15 @@ export default function SongClient() {
 
   const cover = s.cover_key ? supabase.storage.from('covers').getPublicUrl(s.cover_key).data.publicUrl : null
   const artist = s.profiles?.display_name || 'LWEL'
+  const now = player.track?.id === s.id && player.playing
 
-  function onPlay() {
-    if (s.status !== 'approved') return
-    const k = 'played:' + id
-    if (sessionStorage.getItem(k)) return
-    try { sessionStorage.setItem(k, '1') } catch (e) {}
-    supabase.rpc('track_song', { p_song: id, p_kind: 'play' }).then(({ error }) => { if (error) console.error('count failed', error.message) })
-  }
   async function download() {
     setBusy(true)
     const name = (s.title + ' - ' + artist + '.mp3').replace(/[\\/:*?"<>|]/g, '')
     const { data, error } = await supabase.storage.from('audio').createSignedUrl(s.audio_key, 300, { download: name })
     setBusy(false)
     if (error || !data) return alert('Download is not available right now.')
-    if (s.status === 'approved') supabase.rpc('track_song', { p_song: id, p_kind: 'download' }).then(({ error }) => { if (error) console.error('count failed', error.message) })
+    if (s.status === 'approved') supabase.rpc('track_song', { p_song: id, p_kind: 'download' }).then(({ error: e }) => { if (e) console.error('count failed', e.message) })
     window.location.href = data.signedUrl
   }
   const share = () => window.open('https://wa.me/?text=' + encodeURIComponent(s.title + ' on LWEL Music Hub ' + window.location.href))
@@ -76,12 +65,15 @@ export default function SongClient() {
             {s.language ? ' · ' + s.language : ''}
           </p>
           {s.status !== 'approved' && <p className="note">Status: {s.status}. Only you and LWEL can see this song.{s.rejection_reason ? ' Reason: ' + s.rejection_reason : ''}</p>}
-          {src ? <audio className="audioel" controls preload="none" src={src} onPlay={onPlay} /> : <p className="muted">{s.audio_key ? 'Loading audio…' : 'No audio file yet.'}</p>}
           <div className="acts">
-            {s.audio_key && <button className="btn" onClick={download} disabled={busy}>{busy ? 'Preparing…' : 'Download MP3'}</button>}
+            {s.audio_key
+              ? <button className="btn" onClick={() => player.play({ id: s.id, title: s.title, artist, audio_key: s.audio_key, cover, status: s.status })}>{now ? '❚❚ Pause' : '▶ Play'}</button>
+              : <p className="muted">No audio file yet.</p>}
+            {s.audio_key && <button className="btn ghost" onClick={download} disabled={busy}>{busy ? 'Preparing…' : 'Download MP3'}</button>}
             <button className="btn ghost" onClick={share}>Share on WhatsApp</button>
             <button className="btn ghost" onClick={copy}>{copied ? 'Link copied' : 'Copy link'}</button>
           </div>
+          <p className="muted small">The music keeps playing while you browse other pages.</p>
           <p className="muted">{s.views ?? 0} views · {s.plays ?? 0} plays · {s.downloads ?? 0} downloads</p>
         </div>
       </div>

@@ -16,6 +16,8 @@ async function toSquareJpeg(file, size = 400) {
 }
 
 const STATUS = { pending: 'Waiting for review', approved: 'Published', rejected: 'Returned', unpublished: 'Unpublished' }
+const TYPES = { solo: 'Solo artist', choir: 'Choir', group: 'Singing group' }
+const SONG_COLS = 'id,title,status,views,plays,downloads,rejection_reason,audio_key,cover_key'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -23,6 +25,7 @@ export default function Dashboard() {
   const [p, setP] = useState(null)
   const [songs, setSongs] = useState([])
   const [updated, setUpdated] = useState(null)
+  const [editing, setEditing] = useState(false)
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [picMsg, setPicMsg] = useState('')
@@ -38,16 +41,14 @@ export default function Dashboard() {
       if (error) setErr('Could not load your profile: ' + error.message)
       else if (prof.role === 'admin') return router.push('/admin')
       else setP(prof)
-      const { data: mine } = await supabase.from('songs').select('id,title,status,views,plays,downloads,rejection_reason,audio_key,cover_key')
-        .eq('owner_id', user.id).order('created_at', { ascending: false })
+      const { data: mine } = await supabase.from('songs').select(SONG_COLS).eq('owner_id', user.id).order('created_at', { ascending: false })
       setSongs(mine || [])
     })
   }, [router])
 
   useEffect(() => {
     if (!uid) return
-    const load = () => supabase.from('songs').select('id,title,status,views,plays,downloads,rejection_reason,audio_key,cover_key')
-      .eq('owner_id', uid).order('created_at', { ascending: false })
+    const load = () => supabase.from('songs').select(SONG_COLS).eq('owner_id', uid).order('created_at', { ascending: false })
       .then(({ data }) => { if (data) { setSongs(data); setUpdated(new Date()) } })
     const t = setInterval(() => { if (!document.hidden) load() }, 10000)
     const vis = () => { if (!document.hidden) load() }
@@ -59,10 +60,10 @@ export default function Dashboard() {
     e.preventDefault()
     setMsg(''); setErr('')
     const { error } = await supabase.from('profiles')
-      .update({ display_name: p.display_name, profile_type: p.profile_type, bio: p.bio, location: p.location })
-      .eq('id', uid)
-    if (error) setErr(error.message)
-    else setMsg('Profile saved.')
+      .update({ display_name: p.display_name, profile_type: p.profile_type, bio: p.bio, location: p.location }).eq('id', uid)
+    if (error) return setErr(error.message)
+    setMsg('Profile saved.')
+    setEditing(false)
   }
 
   async function pickPhoto(e) {
@@ -92,8 +93,7 @@ export default function Dashboard() {
     setPwMsg('')
     const { error } = await supabase.auth.updateUser({ password: pw })
     if (error) return setPwMsg(error.message)
-    setPw('')
-    setPwMsg('Password changed.')
+    setPw(''); setPwMsg('Password changed.')
   }
 
   async function removeSong(s) {
@@ -114,25 +114,59 @@ export default function Dashboard() {
   if (!p) return <p className="muted">Loading…</p>
   const set = (k) => (e) => setP({ ...p, [k]: e.target.value })
   const sum = (k) => songs.reduce((a, s) => a + (s[k] || 0), 0)
+  const bio = p.bio ? (p.bio.length > 160 ? p.bio.slice(0, 160) + '…' : p.bio) : ''
 
   return (
     <div className="dash">
-      <h1>My dashboard</h1>
-      <p className="muted">
-        Signed in as {p.display_name}{p.role === 'admin' ? ' (LWEL administrator)' : ''}.{' '}
-        <Link href={`/artist/${uid}`} className="link">View my public profile</Link>
-      </p>
+      <div className="profilecard">
+        <Avatar profile={p} size={120} />
+        <div className="pc-info">
+          <h1>{p.display_name}</h1>
+          <p className="by">{TYPES[p.profile_type]}{p.location ? ' · ' + p.location : ''}</p>
+          {bio && <p className="bio">{bio}</p>}
+          <div className="acts">
+            <button className="btn ghost" onClick={() => { setEditing(!editing); setMsg('') }}>{editing ? 'Close editor' : 'Edit profile'}</button>
+            <Link className="btn ghost" href={`/artist/${uid}`}>View public profile</Link>
+            <Link className="btn" href="/upload">Upload a new song</Link>
+          </div>
+          {msg && <p className="ok" role="status">{msg}</p>}
+        </div>
+      </div>
 
-      <div className="acts"><Link className="btn" href="/upload">Upload a new song</Link></div>
+      {editing && (
+        <div className="item">
+          <h3>Edit profile</h3>
+          <div className="picrow">
+            <Avatar profile={p} size={90} />
+            <div>
+              <label className="btn ghost filebtn">Change photo<input type="file" accept="image/*" onChange={pickPhoto} hidden /></label>
+              <p className="muted small">A square picture works best. It is resized automatically.</p>
+              {picMsg && <p className="muted small" role="status">{picMsg}</p>}
+            </div>
+          </div>
+          <form onSubmit={save} className="narrow">
+            <label>Artist or group name<input required value={p.display_name || ''} onChange={set('display_name')} /></label>
+            <label>I am a
+              <select value={p.profile_type} onChange={set('profile_type')}>
+                <option value="solo">Solo artist</option><option value="choir">Choir</option><option value="group">Singing group</option>
+              </select>
+            </label>
+            <label>Location<input value={p.location || ''} onChange={set('location')} placeholder="e.g. Kampala, Uganda" /></label>
+            <label>Biography<textarea rows={5} value={p.bio || ''} onChange={set('bio')} /></label>
+            <div className="acts"><button className="btn">Save profile</button><button type="button" className="btn ghost" onClick={() => setEditing(false)}>Cancel</button></div>
+          </form>
+          {err && <p className="error" role="alert">{err}</p>}
+        </div>
+      )}
 
-      <h2>Statistics</h2>
-      <p className="muted small"><span className="livedot" /> Live, refreshes every 10 seconds{updated ? ' · updated ' + updated.toLocaleTimeString() : ''}</p>
+      <h2>My songs</h2>
       <div className="stats">
         <div><b>{songs.length}</b><span>Songs</span></div>
         <div><b>{sum('views')}</b><span>Views</span></div>
         <div><b>{sum('plays')}</b><span>Plays</span></div>
         <div><b>{sum('downloads')}</b><span>Downloads</span></div>
       </div>
+      <p className="muted small"><span className="livedot" /> Live, refreshes every 10 seconds{updated ? ' · updated ' + updated.toLocaleTimeString() : ''}</p>
       {songs.length === 0 ? (
         <p className="note">You have no songs yet. Use the Upload button to share your first one.</p>
       ) : (
@@ -143,7 +177,9 @@ export default function Dashboard() {
               {songs.map((s) => (
                 <tr key={s.id}>
                   <td><Link href={`/song/${s.id}`} className="link">{s.title}</Link></td>
-                  <td>{STATUS[s.status]}{s.status === 'rejected' && s.rejection_reason ? <div className="muted small">Reason: {s.rejection_reason}</div> : null}</td><td>{s.views}</td><td>{s.plays}</td><td>{s.downloads}</td><td className="rowacts"><Link className="mini-btn" href={`/song/${s.id}/edit`}>Edit</Link><button className="mini-btn danger" onClick={() => removeSong(s)}>Remove</button></td>
+                  <td>{STATUS[s.status]}{s.status === 'rejected' && s.rejection_reason ? <div className="muted small">Reason: {s.rejection_reason}</div> : null}</td>
+                  <td>{s.views}</td><td>{s.plays}</td><td>{s.downloads}</td>
+                  <td className="rowacts"><Link className="mini-btn" href={`/song/${s.id}/edit`}>Edit</Link><button className="mini-btn danger" onClick={() => removeSong(s)}>Remove</button></td>
                 </tr>
               ))}
             </tbody>
@@ -151,41 +187,15 @@ export default function Dashboard() {
         </div>
       )}
 
-      <h2>Profile</h2>
-      <div className="picrow">
-        <Avatar profile={p} size={110} />
-        <div>
-          <label className="btn ghost filebtn">Change photo
-            <input type="file" accept="image/*" onChange={pickPhoto} hidden />
-          </label>
-          <p className="muted small">A square picture works best. It is resized automatically.</p>
-          {picMsg && <p className="muted small" role="status">{picMsg}</p>}
-        </div>
-      </div>
-      <form onSubmit={save} className="narrow">
-        <label>Artist or group name<input required value={p.display_name || ''} onChange={set('display_name')} /></label>
-        <label>I am a
-          <select value={p.profile_type} onChange={set('profile_type')}>
-            <option value="solo">Solo artist</option>
-            <option value="choir">Choir</option>
-            <option value="group">Singing group</option>
-          </select>
-        </label>
-        <label>Location<input value={p.location || ''} onChange={set('location')} placeholder="e.g. Kampala, Uganda" /></label>
-        <label>Biography<textarea rows={5} value={p.bio || ''} onChange={set('bio')} /></label>
-        <button className="btn">Save profile</button>
-      </form>
-      {msg && <p className="ok" role="status">{msg}</p>}
-      {err && <p className="error" role="alert">{err}</p>}
-
-      <h2>Change password</h2>
-      <form onSubmit={changePassword} className="narrow">
-        <PasswordInput label="New password (at least 8 characters)" minLength={8} autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
-        <button className="btn ghost">Change password</button>
-      </form>
-      {pwMsg && <p className="muted" role="status">{pwMsg}</p>}
-
-      <p><button className="btn ghost" onClick={signOut}>Sign out</button></p>
+      <details className="acct">
+        <summary>Account and password</summary>
+        <form onSubmit={changePassword} className="narrow">
+          <PasswordInput label="New password (at least 8 characters)" minLength={8} autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+          <button className="btn ghost">Change password</button>
+        </form>
+        {pwMsg && <p className="muted" role="status">{pwMsg}</p>}
+        <p><button className="btn ghost" onClick={signOut}>Sign out</button></p>
+      </details>
     </div>
   )
 }

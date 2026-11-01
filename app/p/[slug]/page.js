@@ -5,6 +5,14 @@ import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { DEFAULTS, PAGES } from '../../../lib/defaults'
 
+function linkify(text) {
+  return text.split(/(https?:\/\/[^\s]+|[\w.+-]+@[\w-]+\.[\w.-]+)/g).map((part, i) => {
+    if (/^https?:\/\//.test(part)) return <a key={i} className="link" href={part} target="_blank" rel="noopener noreferrer">{part}</a>
+    if (/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(part)) return <a key={i} className="link" href={'mailto:' + part}>{part}</a>
+    return part
+  })
+}
+
 export default function Page() {
   const { slug } = useParams()
   const page = PAGES.find((p) => p.slug === slug)
@@ -22,7 +30,7 @@ export default function Page() {
       <Link href="/" className="back">‹ Home</Link>
       <h1>{page.title}</h1>
       {text === null ? <p className="muted">Loading…</p> : text.split('\n\n').map((b, i) =>
-        b.startsWith('## ') ? <h2 key={i}>{b.slice(3)}</h2> : <p key={i}>{b}</p>)}
+        b.startsWith('## ') ? <h2 key={i}>{b.slice(3)}</h2> : <p key={i}>{linkify(b)}</p>)}
     </article>
   )
 }

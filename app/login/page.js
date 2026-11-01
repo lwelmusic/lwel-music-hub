@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
@@ -14,6 +14,8 @@ export default function Login() {
   const [busy, setBusy] = useState(false)
   const [tok, setTok] = useState(null)
   const [ck, setCk] = useState(0)
+  const [timedOut, setTimedOut] = useState(false)
+  useEffect(() => { setTimedOut(new URLSearchParams(window.location.search).get('timeout') === '1') }, [])
 
   async function submit(e) {
     e.preventDefault()
@@ -29,6 +31,7 @@ export default function Login() {
   return (
     <div className="formbox">
       <h1>Sign in</h1>
+      {timedOut && <p className="note" role="status">You were signed out because you were inactive. Please sign in again.</p>}
       <form onSubmit={submit}>
         <label>Email<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
         <PasswordInput label="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />

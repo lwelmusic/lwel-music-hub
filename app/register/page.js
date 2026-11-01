@@ -51,6 +51,7 @@ export default function Register() {
         </label>
         <label>Email<input type="email" required value={f.email} onChange={set('email')} /></label>
         <PasswordInput label="Password (at least 8 characters)" minLength={8} autoComplete="new-password" value={f.password} onChange={set('password')} />
+        <p className="muted small">By creating an account you agree to the <Link href="/p/terms" className="link">Terms of use</Link>, the <Link href="/p/privacy" className="link">Privacy notice</Link> and the <Link href="/p/contributor-agreement" className="link">Contributor agreement</Link>.</p>
         <Turnstile key={ck} onToken={setTok} />
         <button className="btn" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
       </form>
