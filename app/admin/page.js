@@ -265,7 +265,7 @@ function Reports() {
   return (
     <div>{rows.map((r) => (
       <div className="item" key={r.id}>
-        <h3>{r.songs?.title ? <Link className="link" href={`/song/${r.song_id}`}>{r.songs.title}</Link> : 'Song removed'}</h3>
+        <h3>{r.songs?.title ? <Link className="link" href={`/song/${r.song_id}`}>{r.songs.title}</Link> : (r.song_title ? r.song_title + ' (removed)' : 'Song removed')}</h3>
         <p className="muted small">From {r.reporter_name} ({r.reporter_email}) · {new Date(r.created_at).toLocaleDateString()}</p>
         <p>{r.details}</p>
         <label className="inline">Status

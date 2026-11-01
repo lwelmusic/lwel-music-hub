@@ -2,6 +2,8 @@ import './globals.css'
 import Header from '../components/Header'
 
 export const metadata = {
+  metadataBase: new URL('https://lwel-music-hub.vercel.app'),
+  openGraph: { siteName: 'LWEL Music Hub', images: ['/logo.jpg'], type: 'website' },
   title: 'LWEL Music Hub',
   description: 'A home for SDA music: choirs, singing groups and solo artists. Listen, download and share.'
 }

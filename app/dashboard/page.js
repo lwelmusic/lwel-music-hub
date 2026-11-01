@@ -85,7 +85,7 @@ export default function Dashboard() {
   }
 
   async function removeSong(s) {
-    if (!window.confirm('Remove "' + s.title + '"?')) return
+    if (!window.confirm('Permanently remove "' + s.title + '"? Listeners will no longer be able to play or download it.')) return
     if (s.audio_key) await supabase.storage.from('audio').remove([s.audio_key])
     if (s.cover_key) await supabase.storage.from('covers').remove([s.cover_key])
     const { error } = await supabase.from('songs').delete().eq('id', s.id)
@@ -125,12 +125,12 @@ export default function Dashboard() {
       ) : (
         <div className="tablewrap">
           <table>
-            <thead><tr><th>Song</th><th>Status</th><th>Views</th><th>Plays</th><th>Downloads</th></tr></thead>
+            <thead><tr><th>Song</th><th>Status</th><th>Views</th><th>Plays</th><th>Downloads</th><th></th></tr></thead>
             <tbody>
               {songs.map((s) => (
                 <tr key={s.id}>
                   <td><Link href={`/song/${s.id}`} className="link">{s.title}</Link></td>
-                  <td>{STATUS[s.status]}{s.status === 'rejected' && s.rejection_reason ? <div className="muted small">Reason: {s.rejection_reason}</div> : null}{s.status === 'pending' ? <> <button className="mini-btn danger" onClick={() => removeSong(s)}>Remove</button></> : null}</td><td>{s.views}</td><td>{s.plays}</td><td>{s.downloads}</td>
+                  <td>{STATUS[s.status]}{s.status === 'rejected' && s.rejection_reason ? <div className="muted small">Reason: {s.rejection_reason}</div> : null}</td><td>{s.views}</td><td>{s.plays}</td><td>{s.downloads}</td><td className="rowacts"><Link className="mini-btn" href={`/song/${s.id}/edit`}>Edit</Link><button className="mini-btn danger" onClick={() => removeSong(s)}>Remove</button></td>
                 </tr>
               ))}
             </tbody>

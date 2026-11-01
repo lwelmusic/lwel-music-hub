@@ -92,3 +92,8 @@ footer p{margin:0}
 .audioel{width:100%;margin:8px 0}
 .check{flex-direction:row;align-items:flex-start;gap:10px;color:var(--text)}.check input{min-height:auto;width:20px;height:20px;margin-top:3px}
 @media(min-width:760px){.songhead{grid-template-columns:340px 1fr;gap:36px}}
+a.mini-btn{display:inline-flex;align-items:center}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px}
+.chip{flex:none;min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font:500 14px system-ui,sans-serif;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+.filters{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;margin:4px 0 16px}
