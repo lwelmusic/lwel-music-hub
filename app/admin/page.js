@@ -60,10 +60,11 @@ function Overview({ go }) {
       c(supabase.from('songs').select('id', head).eq('status', 'approved')),
       c(supabase.from('profiles').select('id', head).neq('role', 'admin')),
       c(supabase.from('rights_reports').select('id', head).eq('status', 'open')),
+      c(supabase.from('songs').select('id', head).gte('created_at', new Date(Date.now() - 7 * 864e5).toISOString())),
       supabase.from('songs').select('views,plays,downloads').eq('status', 'approved').then((r) => r.data || [])
-    ]).then(([pending, approved, users, reports, rows]) => {
+    ]).then(([pending, approved, users, reports, recent, rows]) => {
       const sum = (k) => rows.reduce((a, r) => a + (r[k] || 0), 0)
-      setS({ pending, approved, users, reports, views: sum('views'), plays: sum('plays'), downloads: sum('downloads') })
+      setS({ pending, approved, users, reports, recent, views: sum('views'), plays: sum('plays'), downloads: sum('downloads') })
     })
   }, [])
   if (!s) return <p className="muted">Loading…</p>
@@ -74,6 +75,7 @@ function Overview({ go }) {
     <div className="stats four">
       <Card n={s.pending} label="Waiting for review" to="Review queue" />
       <Card n={s.reports} label="Open copyright reports" to="Reports" />
+      <Card n={s.recent} label="New songs this week" to="Songs" />
       <Card n={s.approved} label="Published songs" to="Songs" />
       <Card n={s.users} label="Artist accounts" to="Users" />
       <Card n={s.views} label="Views" />
@@ -440,6 +442,7 @@ function SiteContent({ me }) {
   }
   return (
     <div>
+      <PublishMode me={me} />
       <h2>Homepage</h2>
       <ContentField label="Headline" initial={get('home_headline')} onSave={save('home_headline')} />
       <ContentField label="Introduction" initial={get('home_intro')} rows={3} onSave={save('home_intro')} />
@@ -459,4 +462,32 @@ function AudioPreview({ path }) {
   const [url, setUrl] = useState(null)
   useEffect(() => { supabase.storage.from('audio').createSignedUrl(path, 3600).then(({ data }) => setUrl(data?.signedUrl || null)) }, [path])
   return url ? <audio className="audioel" controls preload="none" src={url} /> : <p className="muted small">Loading audio…</p>
+}
+
+function PublishMode({ me }) {
+  const [mode, setMode] = useState(null)
+  const [msg, setMsg] = useState('')
+  useEffect(() => { supabase.from('site_content').select('value').eq('key', 'auto_publish').maybeSingle().then(({ data }) => setMode(data?.value === 'on' ? 'on' : 'off')) }, [])
+  async function change(v) {
+    setMsg('')
+    const { error } = await supabase.from('site_content').upsert({ key: 'auto_publish', value: v, updated_at: new Date().toISOString(), updated_by: me.id })
+    if (error) return setMsg('Could not save: ' + error.message)
+    setMode(v)
+    await writeLog(me, null, 'site_content', 'Publishing mode: ' + (v === 'on' ? 'publish immediately' : 'review first'))
+    setMsg('Saved. New uploads will ' + (v === 'on' ? 'publish immediately.' : 'wait in the Review queue.'))
+  }
+  if (!mode) return null
+  return (
+    <div className="item">
+      <h3>Publishing mode</h3>
+      <label className="inline">New songs
+        <select value={mode} onChange={(e) => change(e.target.value)}>
+          <option value="on">Publish immediately</option>
+          <option value="off">Wait for administrator review</option>
+        </select>
+      </label>
+      <p className="muted small">You can unpublish or delete any song from the Songs tab at any time, whichever mode is chosen.</p>
+      {msg && <p className="muted" role="status">{msg}</p>}
+    </div>
+  )
 }

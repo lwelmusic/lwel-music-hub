@@ -39,7 +39,8 @@ export default function Upload() {
   const [cover, setCover] = useState(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState(false)
+  const [done, setDone] = useState(null)
+  const [auto, setAuto] = useState(true)
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export default function Upload() {
       setUid(u.id)
     })
     supabase.from('categories').select('*').order('name').then(({ data }) => setCats(data || []))
+    supabase.from('site_content').select('value').eq('key', 'auto_publish').maybeSingle().then(({ data }) => setAuto(data?.value === 'on'))
   }, [router])
 
   async function submit(e) {
@@ -81,7 +83,8 @@ export default function Upload() {
         audio_key: audioKey, cover_key: coverKey, rights_confirmed: true
       })
       if (error) throw error
-      setDone(true)
+      const { data: row } = await supabase.from('songs').select('id,status').eq('id', id).maybeSingle()
+      setDone({ id, status: row?.status || 'pending' })
     } catch (x) {
       if (audioKey) await supabase.storage.from('audio').remove([audioKey])
       if (coverKey) await supabase.storage.from('covers').remove([coverKey])
@@ -93,16 +96,19 @@ export default function Upload() {
 
   if (done) return (
     <div className="formbox">
-      <h1>Song sent for review</h1>
-      <p className="ok">Thank you. LWEL will review your song before it is published. You can follow its status on your dashboard.</p>
-      <p><Link className="btn" href="/dashboard">Go to my dashboard</Link></p>
+      <h1>{done.status === 'approved' ? 'Your song is published' : 'Song sent for review'}</h1>
+      <p className="ok">{done.status === 'approved' ? 'Thank you. Your song is now live on LWEL Music Hub.' : 'Thank you. LWEL will review your song before it is published. You can follow its status on your dashboard.'}</p>
+      <div className="acts">
+        {done.status === 'approved' && <Link className="btn" href={`/song/${done.id}`}>View my song</Link>}
+        <Link className="btn ghost" href="/dashboard">Go to my dashboard</Link>
+      </div>
     </div>
   )
   return (
     <div className="formbox">
       <Link href="/dashboard" className="back">‹ My dashboard</Link>
       <h1>Upload a song</h1>
-      <p className="muted">Your song stays private until LWEL approves it.</p>
+      <p className="muted">{auto ? 'Your song is published straight away. LWEL may remove songs that break the rules or the copyright policy.' : 'Your song stays private until LWEL approves it.'}</p>
       {blocked ? <p className="error">{blocked}</p> : (
         <form onSubmit={submit}>
           <label>Song title<input required value={f.title} onChange={set('title')} /></label>
