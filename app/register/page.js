@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import PasswordInput from '../../components/PasswordInput'
+import Turnstile, { SITE_KEY } from '../../components/Turnstile'
 
 export default function Register() {
   const router = useRouter()
@@ -11,20 +12,25 @@ export default function Register() {
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [tok, setTok] = useState(null)
+  const [ck, setCk] = useState(0)
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
   async function submit(e) {
     e.preventDefault()
-    setErr(''); setMsg(''); setBusy(true)
+    setErr(''); setMsg('')
+    if (SITE_KEY && !tok) return setErr('Please complete the check below.')
+    setBusy(true)
     const { data, error } = await supabase.auth.signUp({
       email: f.email,
       password: f.password,
       options: {
         data: { display_name: f.name.trim(), profile_type: f.type },
-        emailRedirectTo: window.location.origin + '/login'
+        emailRedirectTo: window.location.origin + '/login',
+        captchaToken: tok || undefined
       }
     })
-    setBusy(false)
+    setBusy(false); setTok(null); setCk(ck + 1)
     if (error) return setErr(error.message)
     if (data.session) return router.push('/dashboard')
     setMsg('Almost done. We sent a confirmation link to ' + f.email + '. Open it, then sign in.')
@@ -45,6 +51,7 @@ export default function Register() {
         </label>
         <label>Email<input type="email" required value={f.email} onChange={set('email')} /></label>
         <PasswordInput label="Password (at least 8 characters)" minLength={8} autoComplete="new-password" value={f.password} onChange={set('password')} />
+        <Turnstile key={ck} onToken={setTok} />
         <button className="btn" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
       </form>
       {err && <p className="error" role="alert">{err}</p>}

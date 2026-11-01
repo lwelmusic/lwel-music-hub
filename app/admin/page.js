@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import PasswordInput from '../../components/PasswordInput'
 import { DEFAULTS, PAGES } from '../../lib/defaults'
 
-const TABS = ['Overview', 'Review queue', 'Songs', 'Users', 'Reports', 'Categories', 'Site content', 'Activity', 'Account']
+const TABS = ['Overview', 'Review queue', 'Songs', 'Users', 'Reports', 'Categories', 'Site content', 'Activity', 'Backup', 'Account']
 
 async function writeLog(me, songId, decision, reason) {
   await supabase.from('moderation_logs').insert({ song_id: songId, reviewer_id: me.id, decision, reason: reason || null })
@@ -16,6 +16,10 @@ export default function Admin() {
   const router = useRouter()
   const [me, setMe] = useState(null)
   const [tab, setTab] = useState('Overview')
+  const [stale, setStale] = useState(false)
+  useEffect(() => {
+    try { const l = localStorage.getItem('lwel_last_backup'); setStale(!l || Date.now() - new Date(l).getTime() > 7 * 864e5) } catch (e) {}
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -32,6 +36,7 @@ export default function Admin() {
     <div className="dash wide">
       <h1>Administrator</h1>
       <p className="muted">LWEL Music Hub control room. Signed in as {me.display_name}.</p>
+      {stale && <div className="note">No backup downloaded in the last 7 days. <button className="mini-btn" onClick={() => setTab('Backup')}>Back up now</button></div>}
       <div className="tabs" role="tablist">
         {TABS.map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} className={'tab' + (tab === t ? ' on' : '')} onClick={() => setTab(t)}>{t}</button>
@@ -45,6 +50,7 @@ export default function Admin() {
       {tab === 'Categories' && <Categories />}
       {tab === 'Site content' && <SiteContent me={me} />}
       {tab === 'Activity' && <Activity />}
+      {tab === 'Backup' && <Backup onDone={() => setStale(false)} />}
       {tab === 'Account' && <Account />}
     </div>
   )
@@ -493,6 +499,56 @@ function PublishMode({ me }) {
       </label>
       <p className="muted small">You can unpublish or delete any song from the Songs tab at any time, whichever mode is chosen.</p>
       {msg && <p className="muted" role="status">{msg}</p>}
+    </div>
+  )
+}
+
+const BACKUP_TABLES = ['profiles', 'categories', 'songs', 'site_content', 'moderation_logs', 'rights_reports']
+
+function Backup({ onDone }) {
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [last, setLast] = useState(null)
+  useEffect(() => { try { setLast(localStorage.getItem('lwel_last_backup')) } catch (e) {} }, [])
+  async function run() {
+    setBusy(true); setMsg('Preparing your backup…')
+    try {
+      const out = { app: 'LWEL Music Hub', created_at: new Date().toISOString(), tables: {} }
+      for (const t of BACKUP_TABLES) {
+        let all = [], from = 0
+        for (;;) {
+          const { data, error } = await supabase.from(t).select('*').range(from, from + 999)
+          if (error) throw new Error(t + ': ' + error.message)
+          all = all.concat(data)
+          if (data.length < 1000) break
+          from += 1000
+        }
+        out.tables[t] = all
+      }
+      const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = 'lwel-backup-' + new Date().toISOString().slice(0, 10) + '.json'
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+      const now = new Date().toISOString()
+      try { localStorage.setItem('lwel_last_backup', now) } catch (e) {}
+      setLast(now); onDone()
+      setMsg('Backup downloaded. Store the file somewhere safe, away from this computer too (for example Google Drive or a USB drive).')
+    } catch (e) {
+      setMsg('Backup failed: ' + e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="item">
+      <h3>Download a backup</h3>
+      <p>This saves all profiles, songs, categories, site text, activity log and copyright reports into one file. Do it at least once a week, and before making big changes.</p>
+      <p className="muted small">Last backup on this computer: {last ? new Date(last).toLocaleString() : 'never'}</p>
+      <div className="acts"><button className="btn" onClick={run} disabled={busy}>{busy ? 'Working…' : 'Download backup now'}</button></div>
+      {msg && <p className="muted" role="status">{msg}</p>}
+      <p className="muted small">This file does not include the audio files themselves, nor account passwords (Supabase keeps those separately). Artists should keep their original recordings.</p>
     </div>
   )
 }
