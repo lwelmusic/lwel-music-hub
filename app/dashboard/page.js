@@ -169,7 +169,7 @@ export default function Dashboard() {
       </div>
       <p className="muted small"><span className="livedot" /> Live, refreshes every 10 seconds{updated ? ' · updated ' + updated.toLocaleTimeString() : ''}</p>
       <h3 className="charttitle">Last 14 days</h3>
-      <StatsChart />
+      <StatsChart ownerId={uid} />
       {songs.length === 0 ? (
         <p className="note">You have no songs yet. Use the Upload button to share your first one.</p>
       ) : (

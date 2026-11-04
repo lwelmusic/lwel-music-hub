@@ -31,17 +31,30 @@ export default function PlayerProvider({ children }) {
     setTrack(null); setPlaying(false); setTime(0); setDur(0); setQi({ i: 0, n: 0 })
   }, [])
 
+  const urlCache = useRef({})
+  const getUrl = useCallback(async (t) => {
+    const c = urlCache.current[t.id]
+    if (c && c.exp > Date.now()) return c.url
+    const { data } = await supabase.storage.from('audio').createSignedUrl(t.audio_key, 3600)
+    if (!data?.signedUrl) return null
+    urlCache.current[t.id] = { url: data.signedUrl, exp: Date.now() + 50 * 60 * 1000 }
+    return data.signedUrl
+  }, [])
+
   const startTrack = useCallback(async (t) => {
     const a = audioRef.current
-    const { data } = await supabase.storage.from('audio').createSignedUrl(t.audio_key, 3600)
-    if (!data?.signedUrl) return alert('This song cannot be played right now.')
+    const url = await getUrl(t)
+    if (!url) return alert('This song cannot be played right now.')
     trackRef.current = t
     retries.current = 0
     setTrack(t); setTime(0); setDur(0)
     setQi({ i: idxRef.current, n: queueRef.current.length })
-    a.src = data.signedUrl
+    a.src = url
     a.play().catch(() => {})
-  }, [])
+    // get the next song's link ready now, so the switch is instant (works better with the screen off)
+    const next = queueRef.current[idxRef.current + 1]
+    if (next) getUrl(next)
+  }, [getUrl])
 
   const togglePause = () => { const a = audioRef.current; if (a.paused) a.play().catch(() => {}); else a.pause() }
 
@@ -76,6 +89,7 @@ export default function PlayerProvider({ children }) {
     if (!t || retries.current >= 2) return
     retries.current++
     const pos = a.currentTime
+    delete urlCache.current[t.id]
     const { data } = await supabase.storage.from('audio').createSignedUrl(t.audio_key, 3600)
     if (!data?.signedUrl) return
     a.src = data.signedUrl

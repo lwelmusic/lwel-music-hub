@@ -40,6 +40,18 @@ export default function SongClient() {
   const artist = s.profiles?.display_name || 'LWEL'
   const now = player.track?.id === s.id && player.playing
 
+  async function playHere() {
+    const me = { id: s.id, title: s.title, artist, audio_key: s.audio_key, cover, status: s.status }
+    if (player.track?.id === s.id) return player.play(me)
+    const { data } = await supabase.from('songs').select('id,title,owner_id,cover_key,audio_key,profiles(display_name)')
+      .eq('status', 'approved').neq('id', s.id).not('audio_key', 'is', null).order('created_at', { ascending: false }).limit(30)
+    const others = (data || [])
+      .sort((a, b) => (b.owner_id === s.owner_id) - (a.owner_id === s.owner_id))
+      .map((x) => ({ id: x.id, title: x.title, artist: x.profiles?.display_name || 'LWEL', audio_key: x.audio_key,
+        cover: x.cover_key ? supabase.storage.from('covers').getPublicUrl(x.cover_key).data.publicUrl : null, status: 'approved' }))
+    player.playQueue([me, ...others], 0)
+  }
+
   async function download() {
     setBusy(true)
     const name = (s.title + ' - ' + artist + '.mp3').replace(/[\\/:*?"<>|]/g, '')
@@ -67,13 +79,13 @@ export default function SongClient() {
           {s.status !== 'approved' && <p className="note">Status: {s.status}. Only you and LWEL can see this song.{s.rejection_reason ? ' Reason: ' + s.rejection_reason : ''}</p>}
           <div className="acts">
             {s.audio_key
-              ? <button className="btn" onClick={() => player.play({ id: s.id, title: s.title, artist, audio_key: s.audio_key, cover, status: s.status })}>{now ? '❚❚ Pause' : '▶ Play'}</button>
+              ? <button className="btn" onClick={playHere}>{now ? '❚❚ Pause' : '▶ Play'}</button>
               : <p className="muted">No audio file yet.</p>}
             {s.audio_key && <button className="btn ghost" onClick={download} disabled={busy}>{busy ? 'Preparing…' : 'Download MP3'}</button>}
             <button className="btn ghost" onClick={share}>Share on WhatsApp</button>
             <button className="btn ghost" onClick={copy}>{copied ? 'Link copied' : 'Copy link'}</button>
           </div>
-          <p className="muted small">The music keeps playing while you browse other pages.</p>
+          <p className="muted small">The music keeps playing while you browse other pages, and the next song starts by itself.</p>
           <p className="muted">{s.views ?? 0} views · {s.plays ?? 0} plays · {s.downloads ?? 0} downloads</p>
         </div>
       </div>
