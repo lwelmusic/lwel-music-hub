@@ -19,12 +19,12 @@ export default function Home() {
 
   useEffect(() => {
     supabase.from('songs')
-      .select('id,title,owner_id,cover_key,language,plays,created_at,profiles(display_name),categories(name)')
+      .select('id,title,owner_id,cover_key,audio_key,language,plays,created_at,profiles(display_name),categories(name)')
       .eq('status', 'approved').order('created_at', { ascending: false }).limit(300)
       .then(({ data }) => setSongs(data || []))
     supabase.from('site_content').select('key,value').in('key', ['home_headline', 'home_intro', 'announcement'])
       .then(({ data }) => { const m = {}; (data || []).forEach((r) => { m[r.key] = r.value }); setSite(m) })
-    supabase.from('songs').select('id,title,owner_id,cover_key,profiles(display_name)').eq('status', 'approved').eq('featured', true).limit(8)
+    supabase.from('songs').select('id,title,owner_id,cover_key,audio_key,profiles(display_name)').eq('status', 'approved').eq('featured', true).limit(8)
       .then(({ data }) => setFeatured(data || []))
   }, [])
 
@@ -57,7 +57,7 @@ export default function Home() {
       {featured.length > 0 && (
         <section>
           <h2>Featured</h2>
-          <div className="grid">{featured.map((s) => <SongCard key={s.id} song={s} />)}</div>
+          <div className="grid">{featured.map((s) => <SongCard key={s.id} song={s} queue={featured} />)}</div>
         </section>
       )}
 
@@ -84,7 +84,7 @@ export default function Home() {
             {songs.length === 0 && <Link href="/register" className="link">register to share the first one</Link>}
           </p>
         )}
-        <div className="grid">{list.slice(0, shown).map((s) => <SongCard key={s.id} song={s} />)}</div>
+        <div className="grid">{list.slice(0, shown).map((s) => <SongCard key={s.id} song={s} queue={list} />)}</div>
         {list.length > shown && <p style={{ textAlign: 'center' }}><button className="btn ghost" onClick={() => setShown(shown + PAGE)}>Show more</button></p>}
       </section>
     </>

@@ -15,7 +15,7 @@ export default function ArtistClient() {
 
   useEffect(() => {
     supabase.from('profiles').select('*').eq('id', id).maybeSingle().then(({ data }) => setP(data))
-    supabase.from('songs').select('id,title,owner_id,cover_key,profiles(display_name)').eq('owner_id', id).eq('status', 'approved')
+    supabase.from('songs').select('id,title,owner_id,cover_key,audio_key,profiles(display_name)').eq('owner_id', id).eq('status', 'approved')
       .order('created_at', { ascending: false }).then(({ data }) => setSongs(data || []))
   }, [id])
 
@@ -35,7 +35,7 @@ export default function ArtistClient() {
       </div>
       <h2>Songs ({songs.length})</h2>
       {songs.length === 0 && <p className="muted">No published songs yet.</p>}
-      <div className="grid">{songs.map((s) => <SongCard key={s.id} song={s} />)}</div>
+      <div className="grid">{songs.map((s) => <SongCard key={s.id} song={s} queue={songs} />)}</div>
     </>
   )
 }

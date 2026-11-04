@@ -56,7 +56,7 @@ export default function SongClient() {
     <>
       <Link href="/" className="back">‹ All music</Link>
       <div className="songhead">
-        {cover ? <img className="songcover" src={cover} alt="" /> : <div className="songcover ph">{s.title.charAt(0)}</div>}
+        {cover && !player.dataSaver ? <img className="songcover" src={cover} alt="" /> : <div className="songcover ph">{s.title.charAt(0)}</div>}
         <div>
           <h1>{s.title}</h1>
           <p className="by">

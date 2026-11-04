@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import PasswordInput from '../../components/PasswordInput'
+import StatsChart from '../../components/StatsChart'
 import { DEFAULTS, PAGES } from '../../lib/defaults'
 
 const TABS = ['Overview', 'Review queue', 'Songs', 'Users', 'Reports', 'Categories', 'Site content', 'Activity', 'Backup', 'Account']
@@ -83,6 +84,7 @@ function Overview({ go }) {
     <button className="statbtn" onClick={() => to && go(to)} disabled={!to}><b>{n}</b><span>{label}</span></button>
   )
   return (
+    <>
     <div className="stats four">
       <Card n={s.pending} label="Waiting for review" to="Review queue" />
       <Card n={s.reports} label="Open copyright reports" to="Reports" />
@@ -93,6 +95,9 @@ function Overview({ go }) {
       <Card n={s.plays} label="Plays" />
       <Card n={s.downloads} label="Downloads" />
     </div>
+    <h3 className="charttitle">Last 14 days, all songs</h3>
+    <StatsChart />
+    </>
   )
 }
 

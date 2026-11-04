@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import Avatar from '../../components/Avatar'
 import PasswordInput from '../../components/PasswordInput'
+import StatsChart from '../../components/StatsChart'
 
 async function toSquareJpeg(file, size = 400) {
   const bmp = await createImageBitmap(file)
@@ -167,6 +168,8 @@ export default function Dashboard() {
         <div><b>{sum('downloads')}</b><span>Downloads</span></div>
       </div>
       <p className="muted small"><span className="livedot" /> Live, refreshes every 10 seconds{updated ? ' · updated ' + updated.toLocaleTimeString() : ''}</p>
+      <h3 className="charttitle">Last 14 days</h3>
+      <StatsChart />
       {songs.length === 0 ? (
         <p className="note">You have no songs yet. Use the Upload button to share your first one.</p>
       ) : (
