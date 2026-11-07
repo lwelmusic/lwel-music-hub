@@ -33,7 +33,7 @@ export default function Register() {
     setBusy(false); setTok(null); setCk(ck + 1)
     if (error) return setErr(error.message)
     if (data.session) return router.push('/dashboard')
-    setMsg('Almost done. We sent a confirmation link to ' + f.email + '. Open it, then sign in.')
+    setMsg('Almost done. We sent a confirmation link to ' + f.email + '. Open it, then sign in. If you do not see it within a few minutes, check your spam folder, and make sure the email address is spelled correctly.')
   }
 
   return (
