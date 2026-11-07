@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import Avatar from '../../components/Avatar'
+import Inbox from '../../components/Inbox'
+import { normalizePhone } from '../../lib/phone'
 import PasswordInput from '../../components/PasswordInput'
 import StatsChart from '../../components/StatsChart'
 
@@ -32,6 +34,7 @@ export default function Dashboard() {
   const [picMsg, setPicMsg] = useState('')
   const [pw, setPw] = useState('')
   const [pwMsg, setPwMsg] = useState('')
+  const [phone, setPhone] = useState('')
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -42,6 +45,8 @@ export default function Dashboard() {
       if (error) setErr('Could not load your profile: ' + error.message)
       else if (prof.role === 'admin') return router.push('/admin')
       else setP(prof)
+      const { data: c } = await supabase.from('profile_contacts').select('phone').eq('id', user.id).maybeSingle()
+      setPhone(c?.phone || '')
       const { data: mine } = await supabase.from('songs').select(SONG_COLS).eq('owner_id', user.id).order('created_at', { ascending: false })
       setSongs(mine || [])
     })
@@ -60,9 +65,14 @@ export default function Dashboard() {
   async function save(e) {
     e.preventDefault()
     setMsg(''); setErr('')
+    const np = phone.trim() ? normalizePhone(phone) : null
+    if (phone.trim() && !np) return setErr('Please enter a valid phone number, for example +256 7XX XXX XXX or 07XX XXX XXX.')
     const { error } = await supabase.from('profiles')
       .update({ display_name: p.display_name, profile_type: p.profile_type, bio: p.bio, location: p.location }).eq('id', uid)
     if (error) return setErr(error.message)
+    const { error: ce } = await supabase.from('profile_contacts').upsert({ id: uid, phone: np, updated_at: new Date().toISOString() })
+    if (ce) return setErr(ce.message)
+    setPhone(np || '')
     setMsg('Profile saved.')
     setEditing(false)
   }
@@ -125,6 +135,7 @@ export default function Dashboard() {
           <h1>{p.display_name}</h1>
           <p className="by">{TYPES[p.profile_type]}{p.location ? ' · ' + p.location : ''}</p>
           {bio && <p className="bio">{bio}</p>}
+          {!phone && <p className="note small">Please add your WhatsApp or phone number in Edit profile, so LWEL can reach you. Only LWEL can see it.</p>}
           <div className="acts">
             <button className="btn ghost" onClick={() => { setEditing(!editing); setMsg('') }}>{editing ? 'Close editor' : 'Edit profile'}</button>
             <Link className="btn ghost" href={`/artist/${uid}`}>View public profile</Link>
@@ -133,6 +144,8 @@ export default function Dashboard() {
           {msg && <p className="ok" role="status">{msg}</p>}
         </div>
       </div>
+
+      <Inbox />
 
       {editing && (
         <div className="item">
@@ -153,6 +166,7 @@ export default function Dashboard() {
               </select>
             </label>
             <label>Location<input value={p.location || ''} onChange={set('location')} placeholder="e.g. Kampala, Uganda" /></label>
+            <label>WhatsApp or phone number (private, only LWEL can see it)<input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+256 7XX XXX XXX" /></label>
             <label>Biography<textarea rows={5} value={p.bio || ''} onChange={set('bio')} /></label>
             <div className="acts"><button className="btn">Save profile</button><button type="button" className="btn ghost" onClick={() => setEditing(false)}>Cancel</button></div>
           </form>

@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import PasswordInput from '../../components/PasswordInput'
 import Turnstile, { SITE_KEY } from '../../components/Turnstile'
+import { normalizePhone } from '../../lib/phone'
 
 export default function Register() {
   const router = useRouter()
-  const [f, setF] = useState({ name: '', type: 'solo', email: '', password: '' })
+  const [f, setF] = useState({ name: '', type: 'solo', email: '', phone: '', password: '' })
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -19,13 +20,15 @@ export default function Register() {
   async function submit(e) {
     e.preventDefault()
     setErr(''); setMsg('')
+    const phone = normalizePhone(f.phone)
+    if (!phone) return setErr('Please enter a valid WhatsApp or phone number, for example +256 7XX XXX XXX or 07XX XXX XXX.')
     if (SITE_KEY && !tok) return setErr('Please complete the check below.')
     setBusy(true)
     const { data, error } = await supabase.auth.signUp({
       email: f.email,
       password: f.password,
       options: {
-        data: { display_name: f.name.trim(), profile_type: f.type },
+        data: { display_name: f.name.trim(), profile_type: f.type, phone },
         emailRedirectTo: window.location.origin + '/login',
         captchaToken: tok || undefined
       }
@@ -50,6 +53,8 @@ export default function Register() {
           </select>
         </label>
         <label>Email<input type="email" required value={f.email} onChange={set('email')} /></label>
+        <label>WhatsApp or phone number<input type="tel" required value={f.phone} onChange={set('phone')} placeholder="+256 7XX XXX XXX" /></label>
+        <p className="muted small">Only LWEL can see your number. We use it to contact you about your account and songs.</p>
         <PasswordInput label="Password (at least 8 characters)" minLength={8} autoComplete="new-password" value={f.password} onChange={set('password')} />
         <p className="muted small">By creating an account you agree to the <Link href="/p/terms" className="link">Terms of use</Link>, the <Link href="/p/privacy" className="link">Privacy notice</Link> and the <Link href="/p/contributor-agreement" className="link">Contributor agreement</Link>.</p>
         <Turnstile key={ck} onToken={setTok} />

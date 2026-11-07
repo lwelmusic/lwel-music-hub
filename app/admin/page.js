@@ -7,7 +7,7 @@ import PasswordInput from '../../components/PasswordInput'
 import StatsChart from '../../components/StatsChart'
 import { DEFAULTS, PAGES } from '../../lib/defaults'
 
-const TABS = ['Overview', 'Review queue', 'Songs', 'Playlists', 'Users', 'Reports', 'Categories', 'Site content', 'Activity', 'Backup', 'Account']
+const TABS = ['Overview', 'Review queue', 'Songs', 'Playlists', 'Users', 'Messages', 'Reports', 'Categories', 'Site content', 'Activity', 'Backup', 'Account']
 
 async function writeLog(me, songId, decision, reason) {
   await supabase.from('moderation_logs').insert({ song_id: songId, reviewer_id: me.id, decision, reason: reason || null })
@@ -18,6 +18,7 @@ export default function Admin() {
   const [me, setMe] = useState(null)
   const [tab, setTab] = useState('Overview')
   const [stale, setStale] = useState(false)
+  const [composeTo, setComposeTo] = useState(null)
   useEffect(() => {
     try { const l = localStorage.getItem('lwel_last_backup'); setStale(!l || Date.now() - new Date(l).getTime() > 7 * 864e5) } catch (e) {}
   }, [])
@@ -47,7 +48,8 @@ export default function Admin() {
       {tab === 'Review queue' && <Queue me={me} />}
       {tab === 'Songs' && <Songs me={me} />}
       {tab === 'Playlists' && <Playlists me={me} />}
-      {tab === 'Users' && <Users me={me} />}
+      {tab === 'Users' && <Users me={me} onMessage={(u) => { setComposeTo(u); setTab('Messages') }} />}
+      {tab === 'Messages' && <Messages me={me} to={composeTo} />}
       {tab === 'Reports' && <Reports />}
       {tab === 'Categories' && <Categories />}
       {tab === 'Site content' && <SiteContent me={me} />}
@@ -218,15 +220,17 @@ function Songs({ me }) {
   )
 }
 
-function Users({ me }) {
+function Users({ me, onMessage }) {
   const [rows, setRows] = useState(null)
   const [emails, setEmails] = useState({})
+  const [phones, setPhones] = useState({})
   const [editing, setEditing] = useState(null)
   const [err, setErr] = useState('')
   const load = useCallback(() => {
     supabase.from('profiles').select('id,display_name,profile_type,role,suspended,created_at,bio,location,avatar_url')
       .order('created_at', { ascending: false }).limit(200).then(({ data }) => setRows(data || []))
     supabase.rpc('admin_list_users').then(({ data }) => { const m = {}; (data || []).forEach((u) => { m[u.id] = u }); setEmails(m) })
+    supabase.from('profile_contacts').select('id,phone').then(({ data }) => { const m = {}; (data || []).forEach((c) => { m[c.id] = c.phone }); setPhones(m) })
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -245,7 +249,7 @@ function Users({ me }) {
       {err && <p className="error" role="alert">{err}</p>}
       {editing && <ProfileEditor me={me} profile={editing} onDone={() => { setEditing(null); load() }} />}
       <div className="tablewrap"><table>
-        <thead><tr><th>Name</th><th>Type</th><th>Joined</th><th>Status</th><th>Email</th><th>Email confirmed</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Type</th><th>Joined</th><th>Status</th><th>Email</th><th>Email confirmed</th><th>Phone</th><th></th></tr></thead>
         <tbody>{rows.map((u) => (
           <tr key={u.id}>
             <td><Link className="link" href={`/artist/${u.id}`}>{u.display_name}</Link></td>
@@ -254,8 +258,12 @@ function Users({ me }) {
             <td>{u.suspended ? 'Suspended' : 'Active'}</td>
             <td>{emails[u.id]?.email || '—'}</td>
             <td>{emails[u.id] ? (emails[u.id].confirmed ? 'Yes' : 'No') : '—'}</td>
+            <td>{phones[u.id] || '—'}</td>
             <td className="rowacts">
               <button className="mini-btn" onClick={() => { setEditing(u); window.scrollTo(0, 0) }}>Edit</button>
+              <button className="mini-btn" onClick={() => onMessage(u)}>Message</button>
+              {phones[u.id] && <a className="mini-btn" href={'https://wa.me/' + phones[u.id].replace(/\D/g, '')} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+              {emails[u.id]?.email && <a className="mini-btn" href={'mailto:' + emails[u.id].email}>Email</a>}
               {u.id !== me.id && u.role !== 'admin' && (
                 <button className="mini-btn" onClick={() => change(u, { suspended: !u.suspended }, (u.suspended ? 'Reactivate ' : 'Suspend ') + u.display_name + '?')}>
                   {u.suspended ? 'Reactivate' : 'Suspend'}
@@ -513,7 +521,7 @@ function PublishMode({ me }) {
   )
 }
 
-const BACKUP_TABLES = ['profiles', 'categories', 'songs', 'site_content', 'moderation_logs', 'rights_reports', 'playlists', 'playlist_songs']
+const BACKUP_TABLES = ['profiles', 'categories', 'songs', 'site_content', 'moderation_logs', 'rights_reports', 'playlists', 'playlist_songs', 'profile_contacts', 'messages']
 
 function Backup({ onDone }) {
   const [msg, setMsg] = useState('')
@@ -713,6 +721,68 @@ function PlaylistEditor({ playlist, onDone }) {
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+function Messages({ me, to }) {
+  const [users, setUsers] = useState([])
+  const [target, setTarget] = useState(to ? to.id : 'all')
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [sent, setSent] = useState(null)
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const loadSent = useCallback(() => {
+    supabase.from('messages').select('id,subject,created_at,read_at,profiles!to_user(display_name)')
+      .order('created_at', { ascending: false }).limit(50).then(({ data }) => setSent(data || []))
+  }, [])
+  useEffect(() => {
+    supabase.from('profiles').select('id,display_name,role,suspended').order('display_name').then(({ data }) => setUsers(data || []))
+    loadSent()
+  }, [loadSent])
+
+  async function send(e) {
+    e.preventDefault(); setMsg('')
+    const artists = users.filter((u) => u.role !== 'admin' && !u.suspended)
+    const list = target === 'all' ? artists : users.filter((u) => u.id === target)
+    if (list.length === 0) return setMsg('There is nobody to send this to.')
+    if (target === 'all' && !window.confirm('Send this message to all ' + list.length + ' artists?')) return
+    setBusy(true)
+    const rows = list.map((u) => ({ to_user: u.id, subject: subject.trim(), body: body.trim(), sent_by: me.id }))
+    const { error } = await supabase.from('messages').insert(rows)
+    setBusy(false)
+    if (error) return setMsg('Could not send: ' + error.message)
+    await writeLog(me, null, 'message', (target === 'all' ? 'To all artists' : 'To ' + list[0].display_name) + ': ' + subject.trim())
+    setSubject(''); setBody('')
+    setMsg('Sent to ' + list.length + (list.length === 1 ? ' person.' : ' people.'))
+    loadSent()
+  }
+
+  return (
+    <div>
+      <form className="item" onSubmit={send}>
+        <h3>Send a message</h3>
+        <label>To
+          <select value={target} onChange={(e) => setTarget(e.target.value)}>
+            <option value="all">All artists (not suspended)</option>
+            {users.filter((u) => u.role !== 'admin').map((u) => <option key={u.id} value={u.id}>{u.display_name}</option>)}
+          </select>
+        </label>
+        <label>Subject<input required maxLength={150} value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
+        <label>Message<textarea required rows={6} maxLength={3000} value={body} onChange={(e) => setBody(e.target.value)} /></label>
+        <p className="muted small">The message appears on the artist's dashboard, with a number on their dashboard button. For something urgent, also use the WhatsApp or Email buttons in the Users tab.</p>
+        <div className="acts"><button className="btn" disabled={busy}>{busy ? 'Sending…' : 'Send message'}</button></div>
+        {msg && <p className="muted" role="status">{msg}</p>}
+      </form>
+      <h3 className="charttitle">Recent messages</h3>
+      {!sent ? <p className="muted">Loading…</p> : sent.length === 0 ? <p className="note">No messages sent yet.</p> : (
+        <div className="tablewrap"><table>
+          <thead><tr><th>Sent</th><th>To</th><th>Subject</th><th>Seen</th></tr></thead>
+          <tbody>{sent.map((m) => (
+            <tr key={m.id}><td>{new Date(m.created_at).toLocaleString()}</td><td>{m.profiles?.display_name}</td><td>{m.subject}</td><td>{m.read_at ? 'Read' : 'Not yet'}</td></tr>))}
+          </tbody></table></div>
+      )}
     </div>
   )
 }
