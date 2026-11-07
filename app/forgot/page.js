@@ -20,7 +20,7 @@ export default function Forgot() {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset', captchaToken: tok || undefined })
     setBusy(false); setTok(null); setCk(ck + 1)
     if (error) return setErr(error.message)
-    setMsg('If that email is registered, a reset link is on its way. Check your inbox and spam folder.')
+    setMsg('If that email is registered, a reset link is on its way. It can take a few minutes, so check your spam folder too. Use the same email address you registered with, and wait a minute before asking again.')
   }
 
   return (

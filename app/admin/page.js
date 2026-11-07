@@ -220,11 +220,13 @@ function Songs({ me }) {
 
 function Users({ me }) {
   const [rows, setRows] = useState(null)
+  const [emails, setEmails] = useState({})
   const [editing, setEditing] = useState(null)
   const [err, setErr] = useState('')
   const load = useCallback(() => {
     supabase.from('profiles').select('id,display_name,profile_type,role,suspended,created_at,bio,location,avatar_url')
       .order('created_at', { ascending: false }).limit(200).then(({ data }) => setRows(data || []))
+    supabase.rpc('admin_list_users').then(({ data }) => { const m = {}; (data || []).forEach((u) => { m[u.id] = u }); setEmails(m) })
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -243,13 +245,15 @@ function Users({ me }) {
       {err && <p className="error" role="alert">{err}</p>}
       {editing && <ProfileEditor me={me} profile={editing} onDone={() => { setEditing(null); load() }} />}
       <div className="tablewrap"><table>
-        <thead><tr><th>Name</th><th>Type</th><th>Joined</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Type</th><th>Joined</th><th>Status</th><th>Email</th><th>Email confirmed</th><th></th></tr></thead>
         <tbody>{rows.map((u) => (
           <tr key={u.id}>
             <td><Link className="link" href={`/artist/${u.id}`}>{u.display_name}</Link></td>
             <td>{u.role === 'admin' ? 'Administrator' : TYPES[u.profile_type]}</td>
             <td>{new Date(u.created_at).toLocaleDateString()}</td>
             <td>{u.suspended ? 'Suspended' : 'Active'}</td>
+            <td>{emails[u.id]?.email || '—'}</td>
+            <td>{emails[u.id] ? (emails[u.id].confirmed ? 'Yes' : 'No') : '—'}</td>
             <td className="rowacts">
               <button className="mini-btn" onClick={() => { setEditing(u); window.scrollTo(0, 0) }}>Edit</button>
               {u.id !== me.id && u.role !== 'admin' && (
