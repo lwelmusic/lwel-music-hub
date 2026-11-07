@@ -16,6 +16,7 @@ export default function Home() {
   const [shown, setShown] = useState(PAGE)
   const [site, setSite] = useState({})
   const [featured, setFeatured] = useState([])
+  const [trending, setTrending] = useState({ real: false, rows: [] })
 
   useEffect(() => {
     supabase.from('songs')
@@ -26,6 +27,21 @@ export default function Home() {
       .then(({ data }) => { const m = {}; (data || []).forEach((r) => { m[r.key] = r.value }); setSite(m) })
     supabase.from('songs').select('id,title,owner_id,cover_key,audio_key,profiles(display_name)').eq('status', 'approved').eq('featured', true).limit(8)
       .then(({ data }) => setFeatured(data || []))
+    const SEL = 'id,title,owner_id,cover_key,audio_key,profiles(display_name)'
+    supabase.rpc('trending_songs', { p_days: 7, p_limit: 12 }).then(async ({ data }) => {
+      const ids = (data || []).map((r) => r.song_id)
+      let rows = []
+      if (ids.length) {
+        const { data: s } = await supabase.from('songs').select(SEL).in('id', ids)
+        rows = ids.map((id) => (s || []).find((x) => x.id === id)).filter(Boolean)
+      }
+      const real = rows.length >= 3
+      if (rows.length < 8) {
+        const { data: top } = await supabase.from('songs').select(SEL).eq('status', 'approved').gt('plays', 0).order('plays', { ascending: false }).limit(12)
+        ;(top || []).forEach((x) => { if (rows.length < 12 && !rows.find((r) => r.id === x.id)) rows.push(x) })
+      }
+      setTrending({ real, rows })
+    })
   }, [])
 
   const cats = useMemo(() => ['All', ...new Set((songs || []).map((s) => s.categories?.name).filter(Boolean))], [songs])
@@ -58,6 +74,13 @@ export default function Home() {
         <section>
           <h2>Featured</h2>
           <div className="grid">{featured.map((s) => <SongCard key={s.id} song={s} queue={featured} />)}</div>
+        </section>
+      )}
+
+      {trending.rows.length > 0 && (
+        <section>
+          <h2>{trending.real ? 'Trending this week' : 'Popular songs'}</h2>
+          <div className="grid">{trending.rows.slice(0, 8).map((s) => <SongCard key={s.id} song={s} queue={trending.rows} />)}</div>
         </section>
       )}
 

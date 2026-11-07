@@ -39,9 +39,9 @@ export default function SongClient() {
   const cover = s.cover_key ? supabase.storage.from('covers').getPublicUrl(s.cover_key).data.publicUrl : null
   const artist = s.profiles?.display_name || 'LWEL'
   const now = player.track?.id === s.id && player.playing
+  const me = { id: s.id, title: s.title, artist, audio_key: s.audio_key, cover, status: s.status }
 
   async function playHere() {
-    const me = { id: s.id, title: s.title, artist, audio_key: s.audio_key, cover, status: s.status }
     if (player.track?.id === s.id) return player.play(me)
     const { data } = await supabase.from('songs').select('id,title,owner_id,cover_key,audio_key,profiles(display_name)')
       .eq('status', 'approved').neq('id', s.id).not('audio_key', 'is', null).order('created_at', { ascending: false }).limit(30)
@@ -81,6 +81,7 @@ export default function SongClient() {
             {s.audio_key
               ? <button className="btn" onClick={playHere}>{now ? '❚❚ Pause' : '▶ Play'}</button>
               : <p className="muted">No audio file yet.</p>}
+            {s.audio_key && player.track && player.track.id !== s.id && <button className="btn ghost" onClick={() => player.addNext(me)}>Play next</button>}
             {s.audio_key && <button className="btn ghost" onClick={download} disabled={busy}>{busy ? 'Preparing…' : 'Download MP3'}</button>}
             <button className="btn ghost" onClick={share}>Share on WhatsApp</button>
             <button className="btn ghost" onClick={copy}>{copied ? 'Link copied' : 'Copy link'}</button>
