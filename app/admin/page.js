@@ -7,7 +7,7 @@ import PasswordInput from '../../components/PasswordInput'
 import StatsChart from '../../components/StatsChart'
 import { DEFAULTS, PAGES } from '../../lib/defaults'
 
-const TABS = ['Overview', 'Review queue', 'Songs', 'Users', 'Reports', 'Categories', 'Site content', 'Activity', 'Backup', 'Account']
+const TABS = ['Overview', 'Review queue', 'Songs', 'Playlists', 'Users', 'Reports', 'Categories', 'Site content', 'Activity', 'Backup', 'Account']
 
 async function writeLog(me, songId, decision, reason) {
   await supabase.from('moderation_logs').insert({ song_id: songId, reviewer_id: me.id, decision, reason: reason || null })
@@ -46,6 +46,7 @@ export default function Admin() {
       {tab === 'Overview' && <Overview go={setTab} />}
       {tab === 'Review queue' && <Queue me={me} />}
       {tab === 'Songs' && <Songs me={me} />}
+      {tab === 'Playlists' && <Playlists me={me} />}
       {tab === 'Users' && <Users me={me} />}
       {tab === 'Reports' && <Reports />}
       {tab === 'Categories' && <Categories />}
@@ -508,7 +509,7 @@ function PublishMode({ me }) {
   )
 }
 
-const BACKUP_TABLES = ['profiles', 'categories', 'songs', 'site_content', 'moderation_logs', 'rights_reports']
+const BACKUP_TABLES = ['profiles', 'categories', 'songs', 'site_content', 'moderation_logs', 'rights_reports', 'playlists', 'playlist_songs']
 
 function Backup({ onDone }) {
   const [msg, setMsg] = useState('')
@@ -554,6 +555,160 @@ function Backup({ onDone }) {
       <div className="acts"><button className="btn" onClick={run} disabled={busy}>{busy ? 'Working…' : 'Download backup now'}</button></div>
       {msg && <p className="muted" role="status">{msg}</p>}
       <p className="muted small">This file does not include the audio files themselves, nor account passwords (Supabase keeps those separately). Artists should keep their original recordings.</p>
+    </div>
+  )
+}
+
+function Playlists({ me }) {
+  const [rows, setRows] = useState(null)
+  const [editing, setEditing] = useState(null)
+  const [title, setTitle] = useState('')
+  const [err, setErr] = useState('')
+  const load = useCallback(() => {
+    supabase.from('playlists').select('*, playlist_songs(song_id)').order('position').then(({ data }) => setRows(data || []))
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  async function create(e) {
+    e.preventDefault(); setErr('')
+    const pos = rows.reduce((m, r) => Math.max(m, r.position), 0) + 1
+    const { data, error } = await supabase.from('playlists').insert({ title: title.trim(), position: pos }).select().single()
+    if (error) return setErr(error.message)
+    setTitle('')
+    await writeLog(me, null, 'playlist', 'Created playlist: ' + data.title)
+    setEditing(data); load()
+  }
+  async function toggle(r) {
+    await supabase.from('playlists').update({ published: !r.published, updated_at: new Date().toISOString() }).eq('id', r.id)
+    load()
+  }
+  async function move(i, d) {
+    const a = rows[i], b = rows[i + d]
+    if (!b) return
+    await supabase.from('playlists').update({ position: b.position }).eq('id', a.id)
+    await supabase.from('playlists').update({ position: a.position }).eq('id', b.id)
+    load()
+  }
+  async function remove(r) {
+    if (!window.confirm('Delete the playlist "' + r.title + '"? The songs themselves stay on the site.')) return
+    const { error } = await supabase.from('playlists').delete().eq('id', r.id)
+    if (error) return setErr(error.message)
+    await writeLog(me, null, 'playlist', 'Deleted playlist: ' + r.title)
+    load()
+  }
+
+  if (!rows) return <p className="muted">Loading…</p>
+  if (editing) return <PlaylistEditor me={me} playlist={editing} onDone={() => { setEditing(null); load() }} />
+  return (
+    <div>
+      <form onSubmit={create} className="inlineform">
+        <input required maxLength={120} placeholder="New playlist name, e.g. Sabbath morning" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <button className="btn">Create</button>
+      </form>
+      {err && <p className="error" role="alert">{err}</p>}
+      {rows.length === 0 ? <p className="note">No playlists yet. Create the first one above.</p> : (
+        <ul className="plain">
+          {rows.map((r, i) => (
+            <li key={r.id}>
+              <span>{r.title} <span className="muted small">· {r.playlist_songs.length} songs · {r.published ? 'Visible' : 'Hidden'}</span></span>
+              <span className="rowacts">
+                <button className="mini-btn" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
+                <button className="mini-btn" onClick={() => move(i, 1)} disabled={i === rows.length - 1} aria-label="Move down">↓</button>
+                <button className="mini-btn" onClick={() => setEditing(r)}>Edit</button>
+                <button className="mini-btn" onClick={() => toggle(r)}>{r.published ? 'Hide' : 'Show'}</button>
+                <button className="mini-btn danger" onClick={() => remove(r)}>Delete</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function PlaylistEditor({ playlist, onDone }) {
+  const [f, setF] = useState({ title: playlist.title, description: playlist.description || '' })
+  const [items, setItems] = useState(null)
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState([])
+  const [msg, setMsg] = useState('')
+  const loadItems = useCallback(() => {
+    supabase.from('playlist_songs').select('position,songs(id,title,status,profiles(display_name))').eq('playlist_id', playlist.id).order('position')
+      .then(({ data }) => setItems((data || []).filter((x) => x.songs)))
+  }, [playlist.id])
+  useEffect(() => { loadItems() }, [loadItems])
+  const upd = (sid, pos) => supabase.from('playlist_songs').update({ position: pos }).eq('playlist_id', playlist.id).eq('song_id', sid)
+
+  async function saveInfo(e) {
+    e.preventDefault()
+    const { error } = await supabase.from('playlists').update({ title: f.title.trim(), description: f.description || null, updated_at: new Date().toISOString() }).eq('id', playlist.id)
+    setMsg(error ? error.message : 'Saved.')
+  }
+  async function search(e) {
+    e.preventDefault()
+    let query = supabase.from('songs').select('id,title,profiles(display_name)').eq('status', 'approved').not('audio_key', 'is', null)
+    if (q.trim()) query = query.ilike('title', '%' + q.trim() + '%')
+    const { data } = await query.order('created_at', { ascending: false }).limit(10)
+    setResults(data || [])
+  }
+  async function add(s) {
+    const pos = (items || []).reduce((m, x) => Math.max(m, x.position), 0) + 1
+    const { error } = await supabase.from('playlist_songs').insert({ playlist_id: playlist.id, song_id: s.id, position: pos })
+    if (error) setMsg(error.message); else loadItems()
+  }
+  async function move(i, d) {
+    const a = items[i], b = items[i + d]
+    if (!b) return
+    await upd(a.songs.id, b.position)
+    await upd(b.songs.id, a.position)
+    loadItems()
+  }
+  async function remove(s) {
+    await supabase.from('playlist_songs').delete().eq('playlist_id', playlist.id).eq('song_id', s.id)
+    loadItems()
+  }
+  const inList = (id) => (items || []).some((x) => x.songs.id === id)
+
+  return (
+    <div>
+      <p><button className="btn ghost" onClick={onDone}>‹ Back to playlists</button></p>
+      <form className="item" onSubmit={saveInfo}>
+        <h3>Playlist details</h3>
+        <label>Name<input required maxLength={120} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></label>
+        <label>Short description (optional)<textarea rows={2} maxLength={500} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
+        <div className="acts"><button className="btn">Save details</button></div>
+        {msg && <p className="muted" role="status">{msg}</p>}
+      </form>
+
+      <h3 className="charttitle">Songs in this playlist</h3>
+      {!items ? <p className="muted">Loading…</p> : items.length === 0 ? <p className="note">No songs yet. Search below and add some.</p> : (
+        <ol className="plain">
+          {items.map((x, i) => (
+            <li key={x.songs.id}>
+              <span>{i + 1}. {x.songs.title} <span className="muted small">· {x.songs.profiles?.display_name}{x.songs.status !== 'approved' ? ' · not published, hidden from the public' : ''}</span></span>
+              <span className="rowacts">
+                <button className="mini-btn" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
+                <button className="mini-btn" onClick={() => move(i, 1)} disabled={i === items.length - 1} aria-label="Move down">↓</button>
+                <button className="mini-btn danger" onClick={() => remove(x.songs)}>Remove</button>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      <h3 className="charttitle">Add songs</h3>
+      <form onSubmit={search} className="inlineform">
+        <input placeholder="Search by song title (leave empty for the newest)" value={q} onChange={(e) => setQ(e.target.value)} />
+        <button className="btn">Search</button>
+      </form>
+      <ul className="plain">
+        {results.map((s) => (
+          <li key={s.id}>
+            <span>{s.title} <span className="muted small">· {s.profiles?.display_name}</span></span>
+            {inList(s.id) ? <span className="muted small">In playlist</span> : <button className="mini-btn" onClick={() => add(s)}>Add</button>}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

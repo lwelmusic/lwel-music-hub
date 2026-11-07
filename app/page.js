@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { supabase } from '../lib/supabase'
 import SongCard from '../components/SongCard'
 import { DEFAULTS } from '../lib/defaults'
+import { usePlayer } from '../components/PlayerProvider'
 
 const PAGE = 24
 
@@ -17,6 +18,8 @@ export default function Home() {
   const [site, setSite] = useState({})
   const [featured, setFeatured] = useState([])
   const [trending, setTrending] = useState({ real: false, rows: [] })
+  const [playlists, setPlaylists] = useState([])
+  const { dataSaver } = usePlayer()
 
   useEffect(() => {
     supabase.from('songs')
@@ -42,6 +45,12 @@ export default function Home() {
       }
       setTrending({ real, rows })
     })
+    supabase.from('playlists').select('id,title,description,position,playlist_songs(position,songs(id,cover_key))')
+      .eq('published', true).order('position')
+      .then(({ data }) => setPlaylists((data || []).map((p) => {
+        const ss = (p.playlist_songs || []).filter((x) => x.songs).sort((a, b) => a.position - b.position)
+        return { id: p.id, title: p.title, count: ss.length, cover: ss.map((x) => x.songs.cover_key).find(Boolean) || null }
+      }).filter((p) => p.count > 0)))
   }, [])
 
   const cats = useMemo(() => ['All', ...new Set((songs || []).map((s) => s.categories?.name).filter(Boolean))], [songs])
@@ -74,6 +83,25 @@ export default function Home() {
         <section>
           <h2>Featured</h2>
           <div className="grid">{featured.map((s) => <SongCard key={s.id} song={s} queue={featured} />)}</div>
+        </section>
+      )}
+
+      {playlists.length > 0 && (
+        <section>
+          <h2>Playlists</h2>
+          <div className="grid">
+            {playlists.map((p) => (
+              <article className="card" key={p.id}>
+                <Link href={`/playlist/${p.id}`} className="art plart" aria-label={p.title}>
+                  {p.cover && !dataSaver ? <img className="coverimg" alt="" src={supabase.storage.from('covers').getPublicUrl(p.cover).data.publicUrl} /> : '♪'}
+                </Link>
+                <div>
+                  <h3><Link href={`/playlist/${p.id}`}>{p.title}</Link></h3>
+                  <small className="muted">{p.count} song{p.count === 1 ? '' : 's'}</small>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
       )}
 
